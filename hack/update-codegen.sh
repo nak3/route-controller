@@ -54,30 +54,13 @@ if (( generate_protobufs )); then
   done
 fi
 
-group "Kubernetes Codegen"
-
-# generate the code with:
-# --output-base    because this script should also be able to run inside the vendor dir of
-#                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
-#                  instead of the $GOPATH directly. For normal projects this can be dropped.
-${CODEGEN_PKG}/generate-groups.sh "deepcopy,client,informer,lister" \
-  knative.dev/serving/pkg/client knative.dev/serving/pkg/apis \
-  "serving:v1 serving:v1alpha1 autoscaling:v1alpha1" \
-  --go-header-file "${boilerplate}"
+group "Gateway API Codegen"
 
 # Gateway API
 ${CODEGEN_PKG}/generate-groups.sh "client,informer,lister" \
   github.com/nak3/gateway-api/pkg/client/gatewayapi sigs.k8s.io/gateway-api \
   "apis:v1alpha1" \
   --go-header-file ${REPO_ROOT_DIR}/hack/boilerplate/boilerplate.go.txt
-
-group "Knative Codegen"
-
-# Knative Injection
-${KNATIVE_CODEGEN_PKG}/hack/generate-knative.sh "injection" \
-  knative.dev/serving/pkg/client knative.dev/serving/pkg/apis \
-  "serving:v1 serving:v1alpha1 autoscaling:v1alpha1" \
-  --go-header-file "${boilerplate}"
 
 ## Gateway API
 ${KNATIVE_CODEGEN_PKG}/hack/generate-knative.sh "injection" \
@@ -91,12 +74,13 @@ group "Deepcopy Gen"
 ${GOPATH}/bin/deepcopy-gen \
   -O zz_generated.deepcopy \
   --go-header-file "${boilerplate}" \
-  -i knative.dev/serving/pkg/apis/config \
-  -i knative.dev/serving/pkg/reconciler/route/config \
-  -i knative.dev/serving/pkg/autoscaler/config/autoscalerconfig \
-  -i knative.dev/serving/pkg/autoscaler/scaling \
-  -i knative.dev/serving/pkg/deployment \
-  -i knative.dev/serving/pkg/gc
+  -i github.com/nak3/gateway-api/pkg/reconciler/route/config
+#  -i knative.dev/serving/pkg/apis/config \
+#  -i knative.dev/serving/pkg/reconciler/route/config \
+#  -i knative.dev/serving/pkg/autoscaler/config/autoscalerconfig \
+#  -i knative.dev/serving/pkg/autoscaler/scaling \
+#  -i knative.dev/serving/pkg/deployment \
+#  -i knative.dev/serving/pkg/gc
 
 #group "Generating schemas"
 
