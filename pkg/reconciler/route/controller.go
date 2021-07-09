@@ -19,25 +19,25 @@ package route
 import (
 	"context"
 
-	netclient "knative.dev/networking/pkg/client/injection/client"
-	kubeclient "knative.dev/pkg/client/injection/kube/client"
-	serviceinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/service"
-	servingclient "knative.dev/serving/pkg/client/injection/client"
-	routeinformer "knative.dev/serving/pkg/client/injection/informers/serving/v1/route"
-	routereconciler "knative.dev/serving/pkg/client/injection/reconciler/serving/v1/route"
-
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/cache"
+
 	network "knative.dev/networking/pkg"
+	kubeclient "knative.dev/pkg/client/injection/kube/client"
+	serviceinformer "knative.dev/pkg/client/injection/kube/informers/core/v1/service"
 	"knative.dev/pkg/configmap"
 	"knative.dev/pkg/controller"
 	"knative.dev/pkg/logging"
 	"knative.dev/pkg/tracker"
 	v1 "knative.dev/serving/pkg/apis/serving/v1"
-	"knative.dev/serving/pkg/reconciler/route/config"
+	routeinformer "knative.dev/serving/pkg/client/injection/informers/serving/v1/route"
+	routereconciler "knative.dev/serving/pkg/client/injection/reconciler/serving/v1/route"
+	sconfig "knative.dev/serving/pkg/reconciler/route/config"
 
 	gwapiclient "github.com/nak3/gateway-api/pkg/client/gatewayapi/injection/client"
+	gatewayinformer "github.com/nak3/gateway-api/pkg/client/gatewayapi/injection/informers/apis/v1alpha1/gateway"
 	httprouteinformer "github.com/nak3/gateway-api/pkg/client/gatewayapi/injection/informers/apis/v1alpha1/httproute"
+	"github.com/nak3/gateway-api/pkg/reconciler/route/config"
 )
 
 // NewController initializes the controller and is called by the generated code
@@ -59,22 +59,23 @@ func newController(
 ) *controller.Impl {
 	logger := logging.FromContext(ctx)
 	serviceInformer := serviceinformer.Get(ctx)
+
 	routeInformer := routeinformer.Get(ctx)
 	httprouteInformer := httprouteinformer.Get(ctx)
+	gatewayInformer := gatewayinformer.Get(ctx)
 
 	c := &Reconciler{
 		kubeclient:      kubeclient.Get(ctx),
-		client:          servingclient.Get(ctx),
-		netclient:       netclient.Get(ctx),
 		gwapiclient:     gwapiclient.Get(ctx),
-		serviceLister:   serviceInformer.Lister(),
 		httprouteLister: httprouteInformer.Lister(),
+		gatewayLister:   gatewayInformer.Lister(),
+		serviceLister:   serviceInformer.Lister(),
 		clock:           clock,
 	}
 	impl := routereconciler.NewImpl(ctx, c, func(impl *controller.Impl) controller.Options {
 		configsToResync := []interface{}{
 			&network.Config{},
-			&config.Domain{},
+			&sconfig.Domain{},
 			&config.Gateway{},
 		}
 		resync := configmap.TypeFilter(configsToResync...)(func(string, interface{}) {
@@ -94,8 +95,9 @@ func newController(
 		Handler:    controller.HandleAll(impl.EnqueueControllerOf),
 	}
 	serviceInformer.Informer().AddEventHandler(handleControllerOf)
-	certificateInformer.Informer().AddEventHandler(handleControllerOf)
+
 	httprouteInformer.Informer().AddEventHandler(handleControllerOf)
+	gatewayInformer.Informer().AddEventHandler(handleControllerOf)
 
 	c.tracker = tracker.New(impl.EnqueueKey, controller.GetTrackerLease(ctx))
 
